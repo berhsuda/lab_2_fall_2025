@@ -151,6 +151,7 @@ class ForwardKinematics(Node):
             position.data = end_effector_position
             self.position_publisher.publish(position)
             self.get_logger().info(
+                f"Joint Angles: theta1={theta1:.2f}, theta2={theta2:.2f}, theta3={theta3:.2f} | "
                 f"End-Effector Position: x={end_effector_position[0]:.2f}, y={end_effector_position[1]:.2f}, z={end_effector_position[2]:.2f}"
             )
 

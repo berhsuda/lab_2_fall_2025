@@ -10,18 +10,26 @@ class ForwardKinematics(Node):
 
     def __init__(self):
         super().__init__("forward_kinematics")
-        self.joint_subscription = self.create_subscription(JointState, "joint_states", self.listener_callback, 10)
+        self.joint_subscription = self.create_subscription(
+            JointState, "joint_states", self.listener_callback, 10
+        )
         self.joint_subscription  # prevent unused variable warning
 
-        self.position_publisher = self.create_publisher(Float64MultiArray, "leg_front_l_end_effector_position", 10)
+        self.position_publisher = self.create_publisher(
+            Float64MultiArray, "leg_front_l_end_effector_position", 10
+        )
         self.marker_publisher = self.create_publisher(Marker, "marker", 10)
 
         self.joint_positions = None
         timer_period = 0.02  # publish FK information and marker at 50Hz
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
-        self.kp_publisher = self.create_publisher(Float64MultiArray, "/forward_kp_controller/commands", 10)
-        self.kd_publisher = self.create_publisher(Float64MultiArray, "/forward_kd_controller/commands", 10)
+        self.kp_publisher = self.create_publisher(
+            Float64MultiArray, "/forward_kp_controller/commands", 10
+        )
+        self.kd_publisher = self.create_publisher(
+            Float64MultiArray, "/forward_kd_controller/commands", 10
+        )
 
         # Periodically set gains to 0 so legs go limp
         self.create_timer(0.1, self.publish_zero_gains)
@@ -33,7 +41,9 @@ class ForwardKinematics(Node):
     def listener_callback(self, msg):
         # Extract the positions of the joints related to leg_front_l
         joints_of_interest = ["leg_front_l_1", "leg_front_l_2", "leg_front_l_3"]
-        self.joint_positions = [msg.position[msg.name.index(joint)] for joint in joints_of_interest]
+        self.joint_positions = [
+            msg.position[msg.name.index(joint)] for joint in joints_of_interest
+        ]
 
     def forward_kinematics(self, theta1, theta2, theta3):
 
@@ -53,70 +63,74 @@ class ForwardKinematics(Node):
             # return np.array([
             # ])
             return np.array(
-                            [
-                                [np.cos(angle), 0, np.sin(angle), 0],
-                                [0, 1,0 , 0],
-                                [-np.sin(angle),0 , np.cos(angle), 0],
-                                [0, 0, 0, 1],
-                            ]
-                        )
+                [
+                    [np.cos(angle), 0, np.sin(angle), 0],
+                    [0, 1, 0, 0],
+                    [-np.sin(angle), 0, np.cos(angle), 0],
+                    [0, 0, 0, 1],
+                ]
+            )
 
         def rotation_z(angle):
             ## TODO: Implement the rotation matrix about the z-axis
             # return np.array([
             # ])
             return np.array(
-                            [
-                                [np.cos(angle), -np.sin(angle), 0, 0],
-                                [np.sin(angle), np.cos(angle), 0, 0],
-                                [0, 0, 1, 0],
-                                [0, 0, 0, 1],
-                            ]
-                        )
+                [
+                    [np.cos(angle), -np.sin(angle), 0, 0],
+                    [np.sin(angle), np.cos(angle), 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1],
+                ]
+            )
 
         def translation(x, y, z):
             ## TODO: Implement the translation matrix
             # return np.array([
             # ])
             return np.array(
-                            [
-                                [1, 0, 0, x],
-                                [0, 1, 0, y],
-                                [0, 0 , 1, z],
-                                [0, 0, 0, 1],
-                            ]
-                        )
+                [
+                    [1, 0, 0, x],
+                    [0, 1, 0, y],
+                    [0, 0, 1, z],
+                    [0, 0, 0, 1],
+                ]
+            )
+
         # T_0_1 (base_link to leg_front_l_1)
         # base orientation: z pointing up, x pointing forward, y pointing left
         # translate first
         # rotate so z points right, y points up, x points forward ... 90 degrees on x axis
-        
-        T_0_1 = translation(0.07500, 0.0445, 0) @ rotation_x(1.57080) @ rotation_z(-theta1)
+
+        T_0_1 = (
+            translation(0.07500, 0.0445, 0) @ rotation_x(1.57080) @ rotation_z(-theta1)
+        )
 
         # T_1_2 (leg_front_l_1 to leg_front_l_2)
         ## TODO: Implement the transformation matrix from leg_front_l_1 to leg_front_l_2
-        # translate on z axis 
-        translate_1 = translation(0,0,-0.039)
+        # translate on z axis
+
         orient_2 = rotation_y(-1.57080)
         motor_2 = rotation_z(theta2)
+        translate_1 = translation(0, 0, -0.039)
         T_1_2 = translate_1 @ orient_2 @ motor_2
 
         # T_2_3 (leg_front_l_2 to leg_front_l_3)
         ## TODO: Implement the transformation matrix from leg_front_l_2 to leg_front_l_3
-        translate_2 = translation(0,-0.0494,0.0685)
+        translate_2 = translation(0, -0.0494, 0.0685)
         orient_3 = rotation_y(1.57080)
-        motor_3 = rotation_z(theta3)
+        motor_3 = rotation_z(-theta3)
         T_2_3 = translate_2 @ orient_3 @ motor_3
 
         # T_3_ee (leg_front_l_3 to end-effector)
-        
-        T_3_ee = translation(0.06231,-0.06216,-0.018)
+
+        T_3_ee = translation(0.06231, -0.06216, -0.018)
 
         # TODO: Compute the final transformation. T_0_ee is the multiplication of the previous transformation matrices
         T_0_ee = T_0_1 @ T_1_2 @ T_2_3 @ T_3_ee
 
         # TODO: Extract the end-effector position. The end effector position is a 3x1 vector (not in homogenous coordinates)
-        end_effector_position = T_0_ee @ np.array([0,0,0,1])
+        end_effector_position = T_0_ee @ np.array([0, 0, 0, 1])
 
         return end_effector_position
 
